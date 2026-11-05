@@ -1,6 +1,7 @@
 package com.aquatrack.ui;
 
 import com.aquatrack.dao.UserDao;
+import com.aquatrack.model.Role;
 import com.aquatrack.model.User;
 
 import java.util.List;
@@ -29,29 +30,31 @@ public class AdminMenu {
             System.out.println("1. View All System Users");
             System.out.println("2. View Pending Registrations");
             System.out.println("3. Approve User Account");
-            System.out.println("4. Dashboard");
-            System.out.println("5. Customer Management");
-            System.out.println("6. Products & Stock");
-            System.out.println("7. Order Management");
-            System.out.println("8. Subscription Management");
-            System.out.println("9. Gallon Management");
-            System.out.println("10. Water Quality Logs");
-            System.out.println("11. Reports");
-            System.out.println("12. Logout");
+            System.out.println("4. Update User Role / Status");
+            System.out.println("5. Dashboard");
+            System.out.println("6. Customer Management");
+            System.out.println("7. Products & Stock");
+            System.out.println("8. Order Management");
+            System.out.println("9. Subscription Management");
+            System.out.println("10. Gallon Management");
+            System.out.println("11. Water Quality Logs");
+            System.out.println("12. Reports");
+            System.out.println("13. Logout");
 
-            switch (console.readInt("Choose: ")) {
+            switch (readIntInput("Choose: ")) {
                 case 1: viewAllUsers(); break;
                 case 2: viewPendingUsers(); break;
                 case 3: approveUser(); break;
-                case 4: console.dashboard(); break;
-                case 5: console.customerManagement(); break;
-                case 6: console.productManagement(); break;
-                case 7: console.orderManagement(); break;
-                case 8: console.subscriptionManagement(); break;
-                case 9: console.gallonManagement(); break;
-                case 10: console.qualityManagement("System Administrator"); break;
-                case 11: console.reports(); break;
-                case 12:
+                case 4: updateUser(user); break;
+                case 5: console.dashboard(); break;
+                case 6: console.customerManagement(); break;
+                case 7: console.productManagement(); break;
+                case 8: console.orderManagement(); break;
+                case 9: console.subscriptionManagement(); break;
+                case 10: console.gallonManagement(); break;
+                case 11: console.qualityManagement("System Administrator"); break;
+                case 12: console.reports(); break;
+                case 13:
                     System.out.println("Logged out. Goodbye, " + user.fullName() + "!");
                     return;
                 default: System.out.println("Invalid choice.");
@@ -84,7 +87,7 @@ public class AdminMenu {
         }
 
         while (true) {
-            int id = console.readInt("Enter User ID to approve (0 to cancel): ");
+            int id = readIntInput("Enter User ID to approve (0 to cancel): ");
 
             if (id == 0) {
                 System.out.println("Approval cancelled.");
@@ -108,6 +111,108 @@ public class AdminMenu {
                 System.out.println("Approval failed. Please try again.");
             }
             return;
+        }
+    }
+
+    /** Changes another user's role and status. Enter 0 at any step to cancel. */
+    private void updateUser(User currentAdmin) {
+        System.out.println("\n========== UPDATE USER ROLE / STATUS ==========");
+
+        List<User> users = userDao.getAllUsers();
+        printUserTable(users);
+
+        User target;
+        while (true) {
+            int id = readIntInput("Enter User ID to update (0 to cancel): ");
+
+            if (id == 0) {
+                System.out.println("Update cancelled.");
+                return;
+            }
+            if (id == currentAdmin.userId()) {
+                System.out.println("WARNING: Modifying the currently active admin account is restricted.");
+                continue;
+            }
+
+            target = users.stream().filter(u -> u.userId() == id).findFirst().orElse(null);
+            if (target == null) {
+                System.out.println("ID " + id + " does not exist. Try again.");
+                continue;
+            }
+            break;
+        }
+
+        System.out.println("\nUpdating: " + target.username()
+                + " (current role: " + target.role() + ", status: " + target.status() + ")");
+
+        String newRole = readValidRole();
+        if (newRole == null) {
+            System.out.println("Update cancelled.");
+            return;
+        }
+
+        String newStatus = readValidStatus();
+        if (newStatus == null) {
+            System.out.println("Update cancelled.");
+            return;
+        }
+
+        if (userDao.updateUserRoleAndStatus(target.userId(), newRole, newStatus)) {
+            System.out.println("Success! " + target.username() + " is now " + newRole
+                    + " with status " + newStatus + ".");
+        } else {
+            System.out.println("Update failed. Please try again.");
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // INPUT VALIDATION
+    // ---------------------------------------------------------------
+
+    /** Keeps asking until the user types a whole number. */
+    private int readIntInput(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String line = scanner.nextLine().trim();
+            try {
+                return Integer.parseInt(line);
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a number.");
+            }
+        }
+    }
+
+    /** Returns a valid role name, or null if the admin entered 0 to cancel. */
+    private String readValidRole() {
+        while (true) {
+            System.out.print("New role (ADMIN / STAFF / CUSTOMER, 0 to cancel): ");
+            String input = scanner.nextLine().trim().toUpperCase();
+
+            if (input.equals("0")) {
+                return null;
+            }
+            for (Role role : Role.values()) {
+                if (role.name().equals(input)) {
+                    return input;
+                }
+            }
+            System.out.println("Invalid role. Please enter ADMIN, STAFF or CUSTOMER.");
+        }
+    }
+
+    /** Returns a valid status, or null if the admin entered 0 to cancel. */
+    private String readValidStatus() {
+        while (true) {
+            System.out.print("New status (APPROVED / PENDING, 0 to cancel): ");
+            String input = scanner.nextLine().trim().toUpperCase();
+
+            if (input.equals("0")) {
+                return null;
+            }
+            if (input.equals("APPROVED") || input.equals("PENDING")) {
+                return input;
+            }
+            System.out.println("Invalid status. Please enter APPROVED or PENDING.");
         }
     }
 
