@@ -1,5 +1,6 @@
 package com.aquatrack;
 
+import com.aquatrack.dao.ActivityLogDao;
 import com.aquatrack.dao.DatabaseInitializer;
 import com.aquatrack.dao.UserDao;
 import com.aquatrack.service.RefillStationSystem;
@@ -14,10 +15,11 @@ public class Main {
         DatabaseInitializer.initialize();
 
         UserDao userDao = new UserDao();
+        ActivityLogDao logDao = new ActivityLogDao();
         RefillStationSystem system = new RefillStationSystem();
         Scanner scanner = new Scanner(System.in);
 
-        new Authentication(userDao, scanner, system).start();
+        new Authentication(userDao, logDao, scanner, system).start();
 
         scanner.close();
     }

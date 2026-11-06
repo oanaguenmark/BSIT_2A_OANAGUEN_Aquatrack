@@ -1,5 +1,6 @@
 package com.aquatrack.ui;
 
+import com.aquatrack.dao.ActivityLogDao;
 import com.aquatrack.model.*;
 import com.aquatrack.service.RefillStationSystem;
 
@@ -15,10 +16,24 @@ public class StationConsole {
 
     private final RefillStationSystem system;
     private final Scanner scanner;
+    private final ActivityLogDao logDao;
+    private User currentUser;
 
-    public StationConsole(RefillStationSystem system, Scanner scanner) {
+    public StationConsole(RefillStationSystem system, Scanner scanner, ActivityLogDao logDao) {
         this.system = system;
         this.scanner = scanner;
+        this.logDao = logDao;
+    }
+
+    /** Set by Authentication after login so audit entries record who acted. */
+    public void setCurrentUser(User user) {
+        this.currentUser = user;
+    }
+
+    private void log(String actionType, String description) {
+        if (currentUser != null) {
+            logDao.logAction(currentUser.userId(), actionType, description);
+        }
     }
 
     public RefillStationSystem getSystem() {
@@ -345,6 +360,10 @@ public class StationConsole {
         System.out.println("\nOrder placed successfully!");
         System.out.println("--------------------------------");
         order.displayInfo();
+
+        log("ORDER_PLACED", "Placed " + order.getOrderType() + " order " + order.getOrderId()
+                + " for " + order.getCustomerName()
+                + " - Total: PHP " + String.format("%.2f", order.getTotal()));
     }
 
     public void readOrders() {
@@ -374,6 +393,7 @@ public class StationConsole {
         }
 
         String status = orderStatus();
+        String before = order.getStatus();
 
         if (!system.updateOrderStatus(order, status)) {
             System.out.println("\nCompleted/Cancelled orders can't be changed.");
@@ -381,6 +401,8 @@ public class StationConsole {
         }
 
         System.out.println("\nOrder status updated!");
+        log("ORDER_UPDATED", "Updated Order " + order.getOrderId()
+                + " status from " + before + " to " + status);
 
         if (status.equals("Completed")
                 && order.getPaymentStatus().equals("Unpaid")) {
@@ -390,6 +412,7 @@ public class StationConsole {
             if (paid.equalsIgnoreCase("y")) {
                 system.markOrderPaid(order);
                 System.out.println("Marked as Paid.");
+                log("ORDER_PAID", "Marked Order " + order.getOrderId() + " as Paid");
             }
         }
     }
@@ -407,6 +430,7 @@ public class StationConsole {
 
         system.markOrderPaid(order);
         System.out.println("\nOrder marked as Paid.");
+        log("ORDER_PAID", "Marked Order " + order.getOrderId() + " as Paid");
     }
 
     public void deleteOrder() {
@@ -793,6 +817,8 @@ public class StationConsole {
 
         system.updateOrderStatus(order, "Cancelled");
         System.out.println("\nOrder cancelled.");
+        log("ORDER_UPDATED", "Updated Order " + order.getOrderId()
+                + " status from Pending to Cancelled");
     }
 
     public void mySubscription(Customer customer) {

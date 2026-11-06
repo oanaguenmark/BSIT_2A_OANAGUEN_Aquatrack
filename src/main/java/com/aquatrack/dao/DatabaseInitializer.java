@@ -1,6 +1,7 @@
 package com.aquatrack.dao;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -94,10 +95,10 @@ public final class DatabaseInitializer {
         CREATE TABLE IF NOT EXISTS activity_logs (
             activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL,
-            action      TEXT,
+            action      TEXT NOT NULL,
             details     TEXT,
-            timestamp   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
+            timestamp   TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         )
         """
     );
@@ -105,12 +106,37 @@ public final class DatabaseInitializer {
     public static void initialize() {
         try (Connection conn = DatabaseConnection.getConnection();
              Statement st = conn.createStatement()) {
+            upgradeEmptyActivityLogs(st);
             for (String sql : TABLES) {
                 st.execute(sql);
             }
             System.out.println("[DB] Database initialized (aquatrack.db).");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialize database: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Earlier versions created activity_logs without ON DELETE CASCADE. If that old,
+     * still-empty table is found, drop it so it is rebuilt with the cascade rule.
+     */
+    private static void upgradeEmptyActivityLogs(Statement st) throws SQLException {
+        boolean exists = false;
+        boolean cascade = false;
+        try (ResultSet rs = st.executeQuery("PRAGMA foreign_key_list(activity_logs)")) {
+            while (rs.next()) {
+                exists = true;
+                if ("CASCADE".equalsIgnoreCase(rs.getString(7))) { // column 7 = on_delete
+                    cascade = true;
+                }
+            }
+        }
+        if (exists && !cascade) {
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM activity_logs")) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    st.execute("DROP TABLE activity_logs");
+                }
+            }
         }
     }
 }
